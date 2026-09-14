@@ -115,7 +115,42 @@ h1 {
   background: var(--card);
 }
 
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sort {
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.sort.active {
+  color: var(--chip-text);
+  background: var(--chip-bg);
+}
+
 .count { font-size: 13px; color: var(--muted); }
+
+.edit-input {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 15px;
+}
+
+.edit-input:focus { outline: none; }
+
+.title { cursor: text; }
 
 .tags-bar {
   display: flex;

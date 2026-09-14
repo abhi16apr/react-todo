@@ -27,6 +27,9 @@ export default function App() {
   const [due, setDue] = useState('')
   const [filter, setFilter] = useState('all') // all | active | done
   const [tagFilter, setTagFilter] = useState(null)
+  const [sort, setSort] = useState('manual') // manual | due
+  const [editingId, setEditingId] = useState(null)
+  const [editText, setEditText] = useState('')
   const dragId = useRef(null)
 
   useEffect(() => {
@@ -64,6 +67,28 @@ export default function App() {
     setTodos((prev) => prev.filter((t) => !t.done))
   }
 
+  // --- inline editing ---
+  function startEdit(t) {
+    setEditingId(t.id)
+    setEditText(t.title)
+  }
+
+  function commitEdit() {
+    const title = editText.trim()
+    if (title) {
+      setTodos((prev) =>
+        prev.map((t) => (t.id === editingId ? { ...t, title } : t)),
+      )
+    }
+    setEditingId(null)
+    setEditText('')
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+    setEditText('')
+  }
+
   // --- drag to reorder (operates on the full list by id) ---
   function onDrop(overId) {
     const from = dragId.current
@@ -86,17 +111,27 @@ export default function App() {
   )
 
   const visible = useMemo(() => {
-    return todos.filter((t) => {
+    let items = todos.filter((t) => {
       if (filter === 'active' && t.done) return false
       if (filter === 'done' && !t.done) return false
       if (tagFilter && t.tag !== tagFilter) return false
       return true
     })
-  }, [todos, filter, tagFilter])
+    if (sort === 'due') {
+      // tasks with a due date first (earliest first), undated last
+      items = [...items].sort((a, b) => {
+        if (!a.due && !b.due) return 0
+        if (!a.due) return 1
+        if (!b.due) return -1
+        return a.due.localeCompare(b.due)
+      })
+    }
+    return items
+  }, [todos, filter, tagFilter, sort])
 
   const remaining = todos.filter((t) => !t.done).length
   const today = todayStr()
-  const canDrag = !tagFilter && filter === 'all'
+  const canDrag = !tagFilter && filter === 'all' && sort === 'manual'
 
   return (
     <div className="app">
@@ -142,7 +177,16 @@ export default function App() {
               </button>
             ))}
           </div>
-          <span className="count">{remaining} left</span>
+          <div className="toolbar-right">
+            <button
+              className={`sort ${sort === 'due' ? 'active' : ''}`}
+              onClick={() => setSort(sort === 'due' ? 'manual' : 'due')}
+              title="Sort by due date"
+            >
+              {sort === 'due' ? '↑ due date' : 'sort by due'}
+            </button>
+            <span className="count">{remaining} left</span>
+          </div>
         </div>
       )}
 
@@ -169,39 +213,63 @@ export default function App() {
       <ul className="list">
         {visible.map((t) => {
           const overdue = t.due && !t.done && t.due < today
+          const editing = editingId === t.id
           return (
             <li
               key={t.id}
               className={`${t.done ? 'done' : ''} ${canDrag ? 'draggable' : ''}`}
-              draggable={canDrag}
+              draggable={canDrag && !editing}
               onDragStart={() => (dragId.current = t.id)}
               onDragOver={(e) => canDrag && e.preventDefault()}
               onDrop={() => canDrag && onDrop(t.id)}
             >
               {canDrag && <span className="handle" aria-hidden>⠿</span>}
-              <label>
+              {editing ? (
                 <input
-                  type="checkbox"
-                  checked={t.done}
-                  onChange={() => toggle(t.id)}
+                  className="edit-input"
+                  autoFocus
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  onBlur={commitEdit}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') commitEdit()
+                    if (e.key === 'Escape') cancelEdit()
+                  }}
+                  aria-label="Edit task"
                 />
-                <span className="title">{t.title}</span>
-              </label>
-              <div className="badges">
-                {t.tag && <span className="chip">{t.tag}</span>}
-                {t.due && (
-                  <span className={`due ${overdue ? 'overdue' : ''}`}>
-                    {formatDue(t.due)}
+              ) : (
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={t.done}
+                    onChange={() => toggle(t.id)}
+                  />
+                  <span
+                    className="title"
+                    onDoubleClick={() => startEdit(t)}
+                    title="Double-click to edit"
+                  >
+                    {t.title}
                   </span>
-                )}
-                <button
-                  className="del"
-                  onClick={() => remove(t.id)}
-                  aria-label="Delete"
-                >
-                  ✕
-                </button>
-              </div>
+                </label>
+              )}
+              {!editing && (
+                <div className="badges">
+                  {t.tag && <span className="chip">{t.tag}</span>}
+                  {t.due && (
+                    <span className={`due ${overdue ? 'overdue' : ''}`}>
+                      {formatDue(t.due)}
+                    </span>
+                  )}
+                  <button
+                    className="del"
+                    onClick={() => remove(t.id)}
+                    aria-label="Delete"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
             </li>
           )
         })}
